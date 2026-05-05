@@ -3,5 +3,7 @@ import { ProductPassportDocumentsService } from './product-passport-documents.se
 
 @Controller('documentos-pasaporte-productos')
 export class ProductPassportDocumentsController {
-  constructor(private readonly productPassportDocumentsService: ProductPassportDocumentsService) {}
+  constructor(
+    private readonly productPassportDocumentsService: ProductPassportDocumentsService,
+  ) {}
 }
