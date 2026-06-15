@@ -13,6 +13,7 @@ import { AuthModule } from './core/auth/auth.module';
 import { JwtAuthGuard } from './core/auth/guards/jwt-auth.guard';
 import { ConfigModule } from '@nestjs/config';
 import { authConfig } from './core/auth/config/auth.config';
+import { DocumentAutomationModule } from './modules/document-automation/document-automation.module';
 @Module({
   imports: [
     TypeOrmModule.forRoot(databaseConfig),
@@ -25,6 +26,7 @@ import { authConfig } from './core/auth/config/auth.config';
       isGlobal: true,
       load: [authConfig],
     }),
+    DocumentAutomationModule,
   ],
   controllers: [AppController],
   providers: [

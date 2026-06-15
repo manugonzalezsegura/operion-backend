@@ -11,26 +11,26 @@ services:
       - "5432:5432"
     volumes:
       - operion_postgres_data:/var/lib/postgresql/data
-  
+
   app:
     build:
-    context: 
-    dockerfile: Dockerfile
+      context: .
+      dockerfile: Dockerfile
     container_name: operion_app
     restart: unless-stopped
-  
     depends_on:
       - db
-    
     environment:
-      DB_HOST=db
-      DB_PORT=5432
-      DB_NAME=operion_dev
-      DB_USER=operion
-      DB_PASSWORD=operion123
-      PORT=3000
-      JWT_ACCESS_SECRET=your_jwt_secret_key
-      JWT_ACCESS_EXPIRE_IN=1h
-      JWT_REFRESH_SECRET=your_refresh_secret
-      JWT_REFRESH_EXPIRE_IN=7d
-      
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: operion_dev
+      DB_USER: operion
+      DB_PASSWORD: operion123
+      PORT: "3000"
+      JWT_ACCESS_SECRET: your_jwt_secret_key
+      JWT_ACCESS_EXPIRE_IN: 1h
+      JWT_REFRESH_SECRET: your_refresh_secret
+      JWT_REFRESH_EXPIRE_IN: 7d
+
+volumes:
+  operion_postgres_data:

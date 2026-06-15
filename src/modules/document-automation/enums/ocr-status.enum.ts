@@ -1,0 +1,6 @@
+export enum OcrStatus {
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  NEEDS_REVIEW = 'NEEDS_REVIEW',
+}

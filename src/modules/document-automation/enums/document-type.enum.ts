@@ -1,0 +1,7 @@
+export enum DocumentType {
+  INVOICE = 'INVOICE',
+  RECEIPT = 'RECEIPT',
+  CONTRACT = 'CONTRACT',
+  PAYMENT_PROOF = 'PAYMENT_PROOF',
+  OTHER = 'OTHER',
+}
