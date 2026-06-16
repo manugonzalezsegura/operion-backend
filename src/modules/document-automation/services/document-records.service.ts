@@ -160,7 +160,9 @@ export class DocumentRecordsService {
       documentRecord.providerName = updateDto.providerName;
     }
     if (updateDto.counterpartyRut !== undefined) {
-      documentRecord.counterpartyRut = updateDto.counterpartyRut;
+      documentRecord.counterpartyRut = this.normalizeRut(
+        updateDto.counterpartyRut,
+      );
     }
     if (updateDto.counterpartyName !== undefined) {
       documentRecord.counterpartyName = updateDto.counterpartyName;
@@ -226,6 +228,10 @@ export class DocumentRecordsService {
 
       throw error;
     }
+  }
+
+  private normalizeRut(rut: string): string {
+    return rut.replace(/\./g, '').trim().toLowerCase();
   }
 
   private async findTenantOrFail(tenantId: string): Promise<TenantEntity> {
