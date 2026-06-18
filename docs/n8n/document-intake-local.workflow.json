@@ -1,0 +1,234 @@
+{
+  "name": "Document Intake Local",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "04979cb3-9caf-421a-800e-7e087cc6e96b",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567891",
+              "name": "tenantId",
+              "value": "UUID_REAL_DE_TENANT",
+              "type": "string"
+            },
+            {
+              "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567892",
+              "name": "sourceChannel",
+              "value": "WHATSAPP",
+              "type": "string"
+            },
+            {
+              "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567893",
+              "name": "senderIdentifier",
+              "value": "+56911111111",
+              "type": "string"
+            },
+            {
+              "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567894",
+              "name": "originalFileName",
+              "value": "documento-test.pdf",
+              "type": "string"
+            },
+            {
+              "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567895",
+              "name": "mimeType",
+              "value": "application/pdf",
+              "type": "string"
+            },
+            {
+              "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567896",
+              "name": "externalMessageId",
+              "value": "local-test-001",
+              "type": "string"
+            },
+            {
+              "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567897",
+              "name": "ocrText",
+              "value": "Factura proveedor test rut 11111111-1 total 50000 vence 2026-06-30",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "62f628c0-1516-4856-8a95-ba4fb5b6496a",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/document-automation/documents",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <accessToken>"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "8f28a535-9384-4452-b2db-dd3e74a565b1",
+      "name": "Create Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2144,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d4e5f6a7-b8c9-0123-def0-234567890123",
+              "name": "documentType",
+              "value": "INVOICE",
+              "type": "string"
+            },
+            {
+              "id": "e5f6a7b8-c9d0-1234-ef01-345678901234",
+              "name": "counterpartyRut",
+              "value": "11111111-1",
+              "type": "string"
+            },
+            {
+              "id": "f6a7b8c9-d0e1-2345-f012-456789012345",
+              "name": "counterpartyName",
+              "value": "Proveedor Test",
+              "type": "string"
+            },
+            {
+              "id": "a7b8c9d0-e1f2-3456-0123-567890123456",
+              "name": "financialDirection",
+              "value": "PAYABLE",
+              "type": "string"
+            },
+            {
+              "id": "b8c9d0e1-f2a3-4567-1234-678901234567",
+              "name": "dueDate",
+              "value": "2026-06-30",
+              "type": "string"
+            },
+            {
+              "id": "c9d0e1f2-a3b4-5678-2345-789012345678",
+              "name": "totalAmount",
+              "value": "50000.00",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "334eb406-a131-4e93-9a53-1f08c16b9ead",
+      "name": "Simulated Parsed Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2368,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://host.docker.internal:3000/document-automation/tenants/{{ $('Edit Fields').item.json.tenantId }}/documents/{{ $('Create Document').item.json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <accessToken>"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "bbe00dbc-1f0b-4f47-8542-3b206e24d3c3",
+      "name": "Update Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2576,
+        144
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Create Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Document": {
+      "main": [
+        [
+          {
+            "node": "Simulated Parsed Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simulated Parsed Fields": {
+      "main": [
+        [
+          {
+            "node": "Update Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
