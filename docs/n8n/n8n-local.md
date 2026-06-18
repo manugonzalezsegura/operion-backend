@@ -46,7 +46,7 @@ Si Operion corre como servicio `app` dentro del compose, cambia la base URL en l
 
 | Campo | Valor |
 |---|---|
-| `tenantId` | `UUID_REAL_DE_TENANT` |
+| `tenantId` | `UUID_REAL_DE_TENANT` (placeholder local; debe coincidir con el tenant del JWT para el PATCH) |
 | `sourceChannel` | `WHATSAPP` |
 | `senderIdentifier` | `+56911111111` |
 | `originalFileName` | `documento-test.pdf` |
@@ -109,7 +109,7 @@ Si Operion corre como servicio `app` dentro del compose, cambia la base URL en l
 
 ## Cómo probar
 
-1. **Reemplazar** `UUID_REAL_DE_TENANT` por un `tenantId` real existente en PostgreSQL de Operion.
+1. **Reemplazar** `UUID_REAL_DE_TENANT` por el `tenantId` del usuario con el que harás login (debe coincidir con el JWT usado en los nodos HTTP). Sirve para armar la URL del PATCH; el POST usa el tenant del token aunque el body traiga otro valor.
 2. **Ejecutar Operion** (`npm run start:dev` o servicio `app` en Docker Compose).
 3. **Abrir n8n** en [http://localhost:5678](http://localhost:5678).
 4. **Importar** el workflow desde `docs/n8n/document-intake-local.workflow.json` o recrearlo siguiendo los pasos anteriores.
@@ -174,6 +174,13 @@ Así el repositorio mantiene una copia versionada del workflow local.
 - Sin IA real (el PATCH usa campos fijos simulados).
 - Sin Google Drive ni Google Sheets.
 - Sin credenciales ni secretos en el JSON del workflow.
+
+## Multi-tenant y JWT
+
+- El backend usa el **`tenantId` del JWT** como tenant efectivo en todos los endpoints de `document-automation`.
+- En **POST** (`/documents`, `/payments`), cualquier `tenantId` enviado en el body se **ignora**; Operion sobrescribe con el tenant del token autenticado.
+- En rutas con **`:tenantId` en la URL** (por ejemplo el PATCH de este workflow), el param debe **coincidir** con el `tenantId` del JWT. Si no coincide, el backend responde **`403 Forbidden`**.
+- En el workflow local, el campo `tenantId` de **Edit Fields** se mantiene como **placeholder** para construir URLs y escenarios de prueba (por ejemplo la expresión del PATCH). Debe ser el **mismo UUID** que el tenant del usuario con el que se obtuvo el `accessToken`.
 
 ## Autenticación local con JWT
 
