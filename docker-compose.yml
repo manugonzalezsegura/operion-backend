@@ -4,11 +4,11 @@ services:
     container_name: operion_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: operion
-      POSTGRES_PASSWORD: operion123
-      POSTGRES_DB: operion_dev
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:5432"
     volumes:
       - operion_postgres_data:/var/lib/postgresql/data
 
@@ -23,14 +23,47 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: "5432"
-      DB_NAME: operion_dev
-      DB_USER: operion
-      DB_PASSWORD: operion123
-      PORT: "3000"
-      JWT_ACCESS_SECRET: your_jwt_secret_key
-      JWT_ACCESS_EXPIRE_IN: 1h
-      JWT_REFRESH_SECRET: your_refresh_secret
-      JWT_REFRESH_EXPIRE_IN: 7d
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      PORT: ${PORT}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN}
+
+  n8n_postgres:
+    image: postgres:15
+    container_name: operion_n8n_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${N8N_DB_NAME}
+      POSTGRES_USER: ${N8N_DB_USER}
+      POSTGRES_PASSWORD: ${N8N_DB_PASSWORD}
+    volumes:
+      - operion_n8n_postgres_data:/var/lib/postgresql/data
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: operion_n8n
+    restart: unless-stopped
+    ports:
+      - "${N8N_PORT}:5678"
+    depends_on:
+      - n8n_postgres
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: n8n_postgres
+      DB_POSTGRESDB_PORT: "5432"
+      DB_POSTGRESDB_DATABASE: ${N8N_DB_NAME}
+      DB_POSTGRESDB_USER: ${N8N_DB_USER}
+      DB_POSTGRESDB_PASSWORD: ${N8N_DB_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_HOST: ${N8N_HOST}
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: ${N8N_PROTOCOL}
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL}
 
 volumes:
   operion_postgres_data:
+  operion_n8n_postgres_data:
