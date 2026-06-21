@@ -6,12 +6,21 @@ Workflow de desarrollo local para probar la integración mínima entre **n8n** y
 
 Este workflow es **solo para desarrollo local**. No implementa WhatsApp real, IA real ni integraciones con Google Drive o Google Sheets.
 
-Simula un mensaje/documento recibido por WhatsApp y lo procesa en dos pasos contra el backend de Operion:
+Simula un mensaje/documento recibido por WhatsApp y lo procesa en tres pasos contra el backend de Operion:
 
-1. **POST** `/document-automation/documents` — crea o reutiliza un `DocumentRecord` con metadatos del remitente, nombre del archivo, tipo MIME, un `externalMessageId` de prueba y texto OCR simulado.
+1. **POST** `/document-automation/documents` — crea o reutiliza un `DocumentRecord` con metadatos del remitente, nombre del archivo, tipo MIME, un `externalMessageId` de prueba y texto OCR simulado. El backend exige `externalMessageId` para canales WHATSAPP y EMAIL.
 2. **PATCH** `/document-automation/tenants/:tenantId/documents/:documentId` — completa datos estructurados simulados (tipo de documento, RUT, contraparte, dirección financiera, vencimiento y monto).
+3. **GET** `/document-automation/tenants/:tenantId/counterparties/:rut/summary` — consulta el resumen financiero agregado por RUT de contraparte (documentos, total, pagado y pendiente).
 
 El PATCH **simula la extracción de datos** a partir del OCR; no usa IA real ni servicios externos de parsing.
+
+Después del GET, el nodo **Simulated WhatsApp Reply** prepara un texto de respuesta simulado (no envía WhatsApp real).
+
+Flujo del workflow:
+
+```
+Manual Trigger → Edit Fields → Create Document → Simulated Parsed Fields → Update Document → Get Financial Summary → Simulated WhatsApp Reply
+```
 
 ## URLs del backend
 
@@ -27,9 +36,10 @@ Endpoints usados por defecto en este workflow:
 ```
 POST  http://host.docker.internal:3000/document-automation/documents
 PATCH http://host.docker.internal:3000/document-automation/tenants/{tenantId}/documents/{documentId}
+GET   http://host.docker.internal:3000/document-automation/tenants/{tenantId}/counterparties/{rut}/summary
 ```
 
-Si Operion corre como servicio `app` dentro del compose, cambia la base URL en los nodos **Create Document** y **Update Document** (por ejemplo `http://app:3000/...`).
+Si Operion corre como servicio `app` dentro del compose, cambia la base URL en los nodos **Create Document**, **Update Document** y **Get Financial Summary** (por ejemplo `http://app:3000/...`).
 
 ## Crear el workflow manualmente en n8n
 
@@ -79,7 +89,9 @@ Si Operion corre como servicio `app` dentro del compose, cambia la base URL en l
 | `counterpartyName` | `Proveedor Test` |
 | `financialDirection` | `PAYABLE` |
 | `dueDate` | `2026-06-30` |
-| `totalAmount` | `50000` (tipo **number**, no string) |
+| `totalAmount` | `"50000.00"` (tipo **string** decimal) |
+
+En n8n, configurar `totalAmount` como **string**, no como number. El backend valida montos financieros como **decimal exacto**; enviar `"50000.00"` evita pérdida de precisión y errores de validación que pueden ocurrir con valores numéricos de punto flotante.
 
 ### Nodo 5: Update Document
 
@@ -96,16 +108,52 @@ Si Operion corre como servicio `app` dentro del compose, cambia la base URL en l
 - **Body:** enviar como JSON los campos generados por **Simulated Parsed Fields** (`{{ $json }}`).
 - **Autenticación:** igual que en **Create Document** — header `Authorization: Bearer <accessToken>` agregado manualmente en n8n para pruebas locales.
 
+### Nodo 6: Get Financial Summary
+
+- Tipo: **HTTP Request**
+- **Method:** `GET`
+- **URL** (expresión n8n):
+
+```
+=http://host.docker.internal:3000/document-automation/tenants/{{ $('Edit Fields').item.json.tenantId }}/counterparties/{{ $('Simulated Parsed Fields').item.json.counterpartyRut }}/summary
+```
+
+- Consulta el **saldo/resumen financiero** agregado por RUT de contraparte tras el PATCH.
+- El backend devuelve, entre otros campos: `documentCount`, `totalAmount`, `paidAmount`, `remainingAmount` y un arreglo `documents`.
+- **Nota sobre nombres de nodos:** si al importar n8n renombra nodos (por ejemplo **Edit Fields1**), las expresiones deben referenciar el nombre real de cada nodo.
+- **Autenticación:** header `Authorization: Bearer <accessToken>` agregado manualmente en n8n (igual que en los otros nodos HTTP).
+
+### Nodo 7: Simulated WhatsApp Reply
+
+- Tipo: **Edit Fields** (también llamado **Set**)
+- **No envía WhatsApp real**; solo prepara el texto de respuesta que se enviaría al remitente.
+- Campos generados:
+
+| Campo | Origen / valor |
+|---|---|
+| `recipient` | `senderIdentifier` del nodo **Edit Fields** (por ejemplo `+56911111111`) |
+| `message` | Texto simulado con datos del resumen financiero |
+
+Mensaje sugerido (expresión n8n):
+
+```
+=Resumen para RUT {{ $('Simulated Parsed Fields').item.json.counterpartyRut }}: total documentos {{ $('Get Financial Summary').item.json.documentCount }}, total {{ $('Get Financial Summary').item.json.totalAmount }}, pagado {{ $('Get Financial Summary').item.json.paidAmount }}, pendiente {{ $('Get Financial Summary').item.json.remainingAmount }}.
+```
+
+Si la estructura exacta del response del backend difiere en tu entorno, ajusta las expresiones del campo `message` según los nombres reales devueltos por **Get Financial Summary**.
+
 ### Resultado esperado
 
-- La salida del nodo **Update Document** es el resultado visible final del workflow.
+- La salida del nodo **Simulated WhatsApp Reply** es el resultado visible final del workflow.
 - Tras el PATCH, el `DocumentRecord` debe quedar con datos estructurados simulados:
   - `documentType`: `INVOICE`
   - `counterpartyRut`: `11111111-1`
   - `counterpartyName`: `Proveedor Test`
   - `financialDirection`: `PAYABLE`
   - `dueDate`: `2026-06-30`
-  - `totalAmount`: `50000`
+  - `totalAmount`: `"50000.00"`
+- Tras el GET, **Get Financial Summary** debe devolver el resumen agregado para el RUT `11111111-1`.
+- **Simulated WhatsApp Reply** debe mostrar `recipient` y un `message` con totales del summary (sin enviar mensaje real).
 
 ## Cómo probar
 
@@ -113,11 +161,12 @@ Si Operion corre como servicio `app` dentro del compose, cambia la base URL en l
 2. **Ejecutar Operion** (`npm run start:dev` o servicio `app` en Docker Compose).
 3. **Abrir n8n** en [http://localhost:5678](http://localhost:5678).
 4. **Importar** el workflow desde `docs/n8n/document-intake-local.workflow.json` o recrearlo siguiendo los pasos anteriores.
-5. **Agregar** el header `Authorization: Bearer <accessToken>` en los nodos **Create Document** y **Update Document** (ver sección de autenticación).
+5. **Agregar** el header `Authorization: Bearer <accessToken>` en los nodos **Create Document**, **Update Document** y **Get Financial Summary** (ver sección de autenticación).
 6. **Ejecutar** el workflow manualmente (botón *Execute workflow*).
 7. **Confirmar** que el POST crea un `DocumentRecord` y el PATCH lo enriquece con RUT, vencimiento, monto, tipo y dirección financiera.
-8. **Ejecutar una segunda vez** con el mismo `externalMessageId` (`local-test-001`).
-9. **Confirmar idempotencia:**
+8. **Confirmar** que **Get Financial Summary** devuelve el resumen por RUT y que **Simulated WhatsApp Reply** muestra `recipient` y `message` simulados.
+9. **Ejecutar una segunda vez** con el mismo `externalMessageId` (`local-test-001`).
+10. **Confirmar idempotencia:**
    - El POST reutiliza el mismo documento (`id` igual al de la primera ejecución).
    - El PATCH actualiza ese mismo registro con los campos simulados.
 
@@ -144,14 +193,20 @@ ORDER BY created_at;
 
 Debe existir **un solo** registro para esa combinación `tenantId` + `sourceChannel` + `externalMessageId`, con los campos estructurados completados tras el PATCH.
 
+## Idempotencia (`externalMessageId`)
+
+- La idempotencia del **POST** `/document-automation/documents` aplica **solo cuando `externalMessageId` está presente** en el body.
+- Para workflows **n8n**, **local**, **WhatsApp** o **Email**, `externalMessageId` debe enviarse **siempre** (ID del mensaje, adjunto o evento de origen).
+- Si se **omite** `externalMessageId`, el backend puede crear registros duplicados de forma intencional; eso es útil para entradas manuales donde no hay un identificador externo estable.
+
 ## Importar desde JSON
 
 1. En n8n, ir a **Workflows**.
 2. Usar **Import from File** o **Import from URL**.
 3. Seleccionar `docs/n8n/document-intake-local.workflow.json`.
 4. Revisar y actualizar `UUID_REAL_DE_TENANT` en el nodo **Edit Fields**.
-5. Ajustar las URLs de **Create Document** y **Update Document** si Operion corre como servicio `app`.
-6. Agregar manualmente el header `Authorization: Bearer <accessToken>` en ambos nodos HTTP.
+5. Ajustar las URLs de **Create Document**, **Update Document** y **Get Financial Summary** si Operion corre como servicio `app`.
+6. Agregar manualmente el header `Authorization: Bearer <accessToken>` en los tres nodos HTTP.
 
 ## Exportar el workflow
 
@@ -170,7 +225,7 @@ Así el repositorio mantiene una copia versionada del workflow local.
 
 ## Alcance de esta fase
 
-- Sin WhatsApp real.
+- Sin WhatsApp real (el nodo **Simulated WhatsApp Reply** solo prepara texto; no llama a la API de WhatsApp).
 - Sin IA real (el PATCH usa campos fijos simulados).
 - Sin Google Drive ni Google Sheets.
 - Sin credenciales ni secretos en el JSON del workflow.
@@ -184,7 +239,7 @@ Así el repositorio mantiene una copia versionada del workflow local.
 
 ## Autenticación local con JWT
 
-- Los endpoints `POST /document-automation/documents` y `PATCH /document-automation/tenants/:tenantId/documents/:documentId` están protegidos por JWT.
+- Los endpoints `POST /document-automation/documents`, `PATCH /document-automation/tenants/:tenantId/documents/:documentId` y `GET /document-automation/tenants/:tenantId/counterparties/:rut/summary` están protegidos por JWT.
 - Para probar desde n8n local, primero obtener un `accessToken` con el login local del backend.
 - Ejemplo:
   POST http://localhost:3000/auth/login
@@ -194,7 +249,7 @@ Así el repositorio mantiene una copia versionada del workflow local.
     "password": "Secret123"
   }
 
-- En los nodos **Create Document** y **Update Document**, agregar header:
+- En los nodos **Create Document**, **Update Document** y **Get Financial Summary**, agregar header:
   `Authorization: Bearer <accessToken>`
 
 - El token debe pegarse manualmente en n8n solo para pruebas locales.
@@ -204,10 +259,12 @@ Así el repositorio mantiene una copia versionada del workflow local.
 
 ## Resultado validado localmente
 
-Prueba validada end-to-end con n8n local contra Operion, incluyendo **POST** y **PATCH**:
+Prueba validada end-to-end con n8n local contra Operion, incluyendo **POST**, **PATCH** y **GET summary**:
 
-- **POST** (`Create Document`): crea o reutiliza un `DocumentRecord` por idempotencia (`tenantId` + `sourceChannel` + `externalMessageId`).
+- **POST** (`Create Document`): crea o reutiliza un `DocumentRecord` por idempotencia cuando `externalMessageId` está presente (`tenantId` + `sourceChannel` + `externalMessageId`).
 - **PATCH** (`Update Document`): completa datos estructurados simulados sobre el documento creado o reutilizado.
+- **GET** (`Get Financial Summary`): consulta saldo/resumen financiero agregado por RUT de contraparte.
+- **Simulated WhatsApp Reply**: prepara `recipient` y `message` con totales del summary; no envía WhatsApp real.
 
 Datos validados en el PATCH:
 
@@ -218,7 +275,7 @@ Datos validados en el PATCH:
 | `counterpartyName` | `Proveedor Test` |
 | `financialDirection` | `PAYABLE` |
 | `dueDate` | `2026-06-30` |
-| `totalAmount` | `50000` (number) |
+| `totalAmount` | `"50000.00"` (string decimal) |
 
 Ejecuciones comprobadas:
 

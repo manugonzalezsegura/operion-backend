@@ -177,6 +177,59 @@
         2576,
         144
       ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://host.docker.internal:3000/document-automation/tenants/{{ $('Edit Fields').item.json.tenantId }}/counterparties/{{ $('Simulated Parsed Fields').item.json.counterpartyRut }}/summary",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <accessToken>"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567898",
+      "name": "Get Financial Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2800,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+              "name": "recipient",
+              "value": "={{ $('Edit Fields').item.json.senderIdentifier }}",
+              "type": "string"
+            },
+            {
+              "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+              "name": "message",
+              "value": "=Resumen para RUT {{ $('Simulated Parsed Fields').item.json.counterpartyRut }}: total documentos {{ $('Get Financial Summary').item.json.documentCount }}, total {{ $('Get Financial Summary').item.json.totalAmount }}, pagado {{ $('Get Financial Summary').item.json.paidAmount }}, pendiente {{ $('Get Financial Summary').item.json.remainingAmount }}.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4e5f6a7-b8c9-0123-def0-234567890124",
+      "name": "Simulated WhatsApp Reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3024,
+        144
+      ]
     }
   ],
   "pinData": {},
@@ -219,6 +272,28 @@
         [
           {
             "node": "Update Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Document": {
+      "main": [
+        [
+          {
+            "node": "Get Financial Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Financial Summary": {
+      "main": [
+        [
+          {
+            "node": "Simulated WhatsApp Reply",
             "type": "main",
             "index": 0
           }

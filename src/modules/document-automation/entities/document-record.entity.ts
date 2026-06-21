@@ -100,7 +100,13 @@ export class DocumentRecordEntity {
   @Column({ name: 'due_date', type: 'date', nullable: true })
   dueDate?: string | null;
 
-  @Column({ name: 'total_amount', type: 'numeric', nullable: true })
+  @Column({
+    name: 'total_amount',
+    type: 'numeric',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
   totalAmount?: string | null;
 
   @Column({ type: 'varchar', default: 'CLP' })

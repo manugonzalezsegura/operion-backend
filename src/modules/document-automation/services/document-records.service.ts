@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -11,6 +12,7 @@ import { CreateDocumentRecordDto } from '../dto/create-document-record.dto';
 import { DocumentRecordResponseDto } from '../dto/document-record-response.dto';
 import { UpdateDocumentRecordDto } from '../dto/update-document-record.dto';
 import { DocumentRecordEntity } from '../entities/document-record.entity';
+import { DocumentChannel } from '../enums/document-channel.enum';
 import { DocumentStatus } from '../enums/document-status.enum';
 import { DocumentRecordMapper } from '../mappers/document-record.mapper';
 
@@ -32,12 +34,17 @@ export class DocumentRecordsService {
 
     const tenant = await this.findTenantOrFail(createDto.tenantId);
 
-    if (createDto.externalMessageId) {
+    this.assertExternalMessageIdForAutomatedChannels(createDto);
+
+
+    const externalMessageId = createDto.externalMessageId?.trim() || undefined;
+
+    if (externalMessageId) {
       const existingDocument = await this.documentRecordRepository.findOne({
         where: {
           tenantId: createDto.tenantId,
           sourceChannel: createDto.sourceChannel,
-          externalMessageId: createDto.externalMessageId,
+          externalMessageId,
         },
       });
 
@@ -54,7 +61,7 @@ export class DocumentRecordsService {
       senderIdentifier: createDto.senderIdentifier,
       originalFileName: createDto.originalFileName,
       mimeType: createDto.mimeType,
-      externalMessageId: createDto.externalMessageId,
+      externalMessageId,
       ocrText: createDto.ocrText,
       processingStatus: DocumentStatus.RECEIVED,
     });
@@ -70,12 +77,12 @@ export class DocumentRecordsService {
         'code' in error &&
         error.code === '23505'
       ) {
-        if (createDto.externalMessageId) {
+        if (externalMessageId) {
           const existingDocument = await this.documentRecordRepository.findOne({
             where: {
               tenantId: createDto.tenantId,
               sourceChannel: createDto.sourceChannel,
-              externalMessageId: createDto.externalMessageId,
+              externalMessageId,
             },
           });
 
@@ -227,6 +234,25 @@ export class DocumentRecordsService {
       }
 
       throw error;
+    }
+  }
+
+  private assertExternalMessageIdForAutomatedChannels(
+    createDto: CreateDocumentRecordDto,
+  ): void {
+    const requiresExternalMessageId =
+      createDto.sourceChannel === DocumentChannel.WHATSAPP ||
+      createDto.sourceChannel === DocumentChannel.EMAIL;
+
+    if (!requiresExternalMessageId) {
+      return;
+    }
+
+    const externalMessageId = createDto.externalMessageId?.trim();
+    if (!externalMessageId) {
+      throw new BadRequestException(
+        'externalMessageId es obligatorio para canales automatizados',
+      );
     }
   }
 
